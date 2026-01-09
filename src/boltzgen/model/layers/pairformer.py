@@ -32,15 +32,14 @@ class PairformerModule(nn.Module):
         dropout: float = 0.25,
         pairwise_head_width: int = 32,
         pairwise_num_heads: int = 4,
-        post_layer_norm: bool = False,
         activation_checkpointing: bool = False,
+        **kwargs,  # Absorb legacy parameters like post_layer_norm
     ) -> None:
         super().__init__()
         self.token_z = token_z
         self.num_blocks = num_blocks
         self.dropout = dropout
         self.num_heads = num_heads
-        self.post_layer_norm = post_layer_norm
         self.activation_checkpointing = activation_checkpointing
 
         self.layers = nn.ModuleList()
@@ -53,7 +52,6 @@ class PairformerModule(nn.Module):
                     dropout,
                     pairwise_head_width,
                     pairwise_num_heads,
-                    post_layer_norm,
                 ),
             )
 
@@ -104,13 +102,12 @@ class PairformerLayer(nn.Module):
         dropout: float = 0.25,
         pairwise_head_width: int = 32,
         pairwise_num_heads: int = 4,
-        post_layer_norm: bool = False,
+        **kwargs,  # Absorb legacy parameters like post_layer_norm
     ) -> None:
         super().__init__()
         self.token_z = token_z
         self.dropout = dropout
         self.num_heads = num_heads
-        self.post_layer_norm = post_layer_norm
 
         self.pre_norm_s = nn.LayerNorm(token_s)
         self.attention = AttentionPairBias(token_s, token_z, num_heads)
@@ -127,10 +124,6 @@ class PairformerLayer(nn.Module):
 
         self.transition_s = Transition(token_s, token_s * 4)
         self.transition_z = Transition(token_z, token_z * 4)
-
-        self.s_post_norm = (
-            nn.LayerNorm(token_s) if self.post_layer_norm else nn.Identity()
-        )
 
     def forward(
         self,
@@ -180,7 +173,6 @@ class PairformerLayer(nn.Module):
                 s=s_normed, z=z.float(), mask=mask.float(), k_in=s_normed
             )
             s = s + self.transition_s(s)
-            s = self.s_post_norm(s)
 
         return s, z
 
@@ -195,14 +187,13 @@ class PairformerNoSeqModule(nn.Module):
         dropout: float = 0.25,
         pairwise_head_width: int = 32,
         pairwise_num_heads: int = 4,
-        post_layer_norm: bool = False,
         activation_checkpointing: bool = False,
+        **kwargs,  # Absorb legacy parameters like post_layer_norm
     ) -> None:
         super().__init__()
         self.token_z = token_z
         self.num_blocks = num_blocks
         self.dropout = dropout
-        self.post_layer_norm = post_layer_norm
         self.activation_checkpointing = activation_checkpointing
 
         self.layers = nn.ModuleList()
@@ -213,7 +204,6 @@ class PairformerNoSeqModule(nn.Module):
                     dropout,
                     pairwise_head_width,
                     pairwise_num_heads,
-                    post_layer_norm,
                 ),
             )
 
@@ -261,12 +251,11 @@ class PairformerNoSeqLayer(nn.Module):
         dropout: float = 0.25,
         pairwise_head_width: int = 32,
         pairwise_num_heads: int = 4,
-        post_layer_norm: bool = False,
+        **kwargs,  # Absorb legacy parameters like post_layer_norm
     ) -> None:
         super().__init__()
         self.token_z = token_z
         self.dropout = dropout
-        self.post_layer_norm = post_layer_norm
         self.tri_mul_out = TriangleMultiplicationOutgoing(token_z)
         self.tri_mul_in = TriangleMultiplicationIncoming(token_z)
 

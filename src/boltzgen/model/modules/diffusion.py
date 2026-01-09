@@ -18,7 +18,6 @@ from typing import Any, Dict, Optional, List
 from tqdm import tqdm
 import boltzgen.model.layers.initialize as init
 from boltzgen.data import const
-from boltzgen.model.layers.miniformer import MiniformerModule
 from boltzgen.model.layers.pairformer import PairformerModule
 from boltzgen.model.loss.diffusion import (
     compute_bond_loss,
@@ -81,7 +80,6 @@ class DiffusionModule(Module):
         token_layers: int = 1,
         token_transformer_depth: int = 6,
         token_transformer_heads: int = 8,
-        use_miniformer: bool = False,
         diffusion_pairformer_args: Dict[str, Any] = None,
         atom_decoder_depth: int = 3,
         atom_decoder_heads: int = 4,

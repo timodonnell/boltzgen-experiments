@@ -78,7 +78,7 @@ class DiffusionTransformer(Module):
         dim_single_cond=None,
         use_qk_norm=False,
         activation_checkpointing=False,
-        post_layer_norm=False,
+        **kwargs,  # Absorb legacy parameters like post_layer_norm
     ):
         super().__init__()
         self.activation_checkpointing = activation_checkpointing
@@ -92,7 +92,6 @@ class DiffusionTransformer(Module):
                     heads,
                     dim=dim,
                     dim_single_cond=dim_single_cond,
-                    post_layer_norm=post_layer_norm,
                     use_qk_norm=use_qk_norm,
                 )
             )
@@ -145,8 +144,8 @@ class DiffusionTransformerLayer(Module):
         heads,
         dim=384,
         dim_single_cond=None,
-        post_layer_norm=False,
         use_qk_norm=False,
+        **kwargs,  # Absorb legacy parameters like post_layer_norm
     ):
         super().__init__()
 
@@ -171,11 +170,6 @@ class DiffusionTransformerLayer(Module):
         self.transition = ConditionedTransitionBlock(
             dim_single=dim, dim_single_cond=dim_single_cond
         )
-
-        if post_layer_norm:
-            self.post_lnorm = nn.LayerNorm(dim)
-        else:
-            self.post_lnorm = nn.Identity()
 
     def forward(
         self,
@@ -205,7 +199,6 @@ class DiffusionTransformerLayer(Module):
         a = a + b
         a = a + self.transition(a, s)
 
-        a = self.post_lnorm(a)
         return a
 
 

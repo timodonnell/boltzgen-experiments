@@ -5,10 +5,6 @@ from torch import Tensor, nn
 from torch.nn.functional import one_hot
 
 from boltzgen.data import const
-from boltzgen.model.layers.miniformer import (
-    MiniformerNoSeqLayer,
-    MiniformerNoSeqModule,
-)
 from boltzgen.model.layers.outer_product_mean import OuterProductMean
 from boltzgen.model.layers.pair_averaging import PairWeightedAveraging
 from boltzgen.model.layers.pairformer import (
@@ -261,7 +257,7 @@ class TemplateModule(nn.Module):
         min_dist: float = 3.25,
         max_dist: float = 50.75,
         num_bins: int = 38,
-        miniformer_blocks: bool = False,
+        **kwargs,  # Absorb legacy parameters like miniformer_blocks
     ) -> None:
         """Initialize the template module.
 
@@ -286,24 +282,15 @@ class TemplateModule(nn.Module):
         )
         self.u_proj = nn.Linear(template_dim, token_z, bias=False)
 
-        if miniformer_blocks:
-            self.pairformer = MiniformerNoSeqModule(
-                template_dim,
-                num_blocks=template_blocks,
-                dropout=dropout,
-                post_layer_norm=post_layer_norm,
-                activation_checkpointing=activation_checkpointing,
-            )
-        else:
-            self.pairformer = PairformerNoSeqModule(
-                template_dim,
-                num_blocks=template_blocks,
-                dropout=dropout,
-                pairwise_head_width=pairwise_head_width,
-                pairwise_num_heads=pairwise_num_heads,
-                post_layer_norm=post_layer_norm,
-                activation_checkpointing=activation_checkpointing,
-            )
+        self.pairformer = PairformerNoSeqModule(
+            template_dim,
+            num_blocks=template_blocks,
+            dropout=dropout,
+            pairwise_head_width=pairwise_head_width,
+            pairwise_num_heads=pairwise_num_heads,
+            post_layer_norm=post_layer_norm,
+            activation_checkpointing=activation_checkpointing,
+        )
 
     def forward(
         self,
@@ -421,8 +408,8 @@ class TokenDistanceModule(nn.Module):
         max_dist: float = 50.75,
         num_bins: int = 38,
         distance_gaussian_dim: int = 32,
-        miniformer_blocks: bool = False,
         use_token_distance_feats: bool = True,
+        **kwargs,  # Absorb legacy parameters like miniformer_blocks
     ) -> None:
         """Initialize the template module.
 
@@ -448,24 +435,15 @@ class TokenDistanceModule(nn.Module):
         )
         self.u_proj = nn.Linear(token_distance_dim, token_z, bias=False)
 
-        if miniformer_blocks:
-            self.pairformer = MiniformerNoSeqModule(
-                token_distance_dim,
-                num_blocks=token_distance_blocks,
-                dropout=dropout,
-                post_layer_norm=post_layer_norm,
-                activation_checkpointing=activation_checkpointing,
-            )
-        else:
-            self.pairformer = PairformerNoSeqModule(
-                token_distance_dim,
-                num_blocks=token_distance_blocks,
-                dropout=dropout,
-                pairwise_head_width=pairwise_head_width,
-                pairwise_num_heads=pairwise_num_heads,
-                post_layer_norm=post_layer_norm,
-                activation_checkpointing=activation_checkpointing,
-            )
+        self.pairformer = PairformerNoSeqModule(
+            token_distance_dim,
+            num_blocks=token_distance_blocks,
+            dropout=dropout,
+            pairwise_head_width=pairwise_head_width,
+            pairwise_num_heads=pairwise_num_heads,
+            post_layer_norm=post_layer_norm,
+            activation_checkpointing=activation_checkpointing,
+        )
 
         if use_token_distance_feats:
             self.token_distance_encoder = DistanceTokenEncoder(
@@ -548,11 +526,11 @@ class MSAModule(nn.Module):
         msa_blocks: int,
         msa_dropout: float,
         z_dropout: float,
-        miniformer_blocks: bool = True,
         pairwise_head_width: int = 32,
         pairwise_num_heads: int = 4,
         activation_checkpointing: bool = False,
         use_paired_feature: bool = False,
+        **kwargs,  # Absorb legacy parameters like miniformer_blocks
     ) -> None:
         """Initialize the MSA module.
 
@@ -583,7 +561,6 @@ class MSAModule(nn.Module):
                     token_z,
                     msa_dropout,
                     z_dropout,
-                    miniformer_blocks,
                     pairwise_head_width,
                     pairwise_num_heads,
                 )
@@ -696,7 +673,6 @@ class MSALayer(nn.Module):
         token_z: int,
         msa_dropout: float,
         z_dropout: float,
-        miniformer_blocks: bool = True,
         pairwise_head_width: int = 32,
         pairwise_num_heads: int = 4,
     ) -> None:
@@ -718,17 +694,12 @@ class MSALayer(nn.Module):
             num_heads=8,
         )
 
-        if miniformer_blocks:
-            self.pairformer_layer = MiniformerNoSeqLayer(
-                token_z=token_z, dropout=z_dropout
-            )
-        else:
-            self.pairformer_layer = PairformerNoSeqLayer(
-                token_z=token_z,
-                dropout=z_dropout,
-                pairwise_head_width=pairwise_head_width,
-                pairwise_num_heads=pairwise_num_heads,
-            )
+        self.pairformer_layer = PairformerNoSeqLayer(
+            token_z=token_z,
+            dropout=z_dropout,
+            pairwise_head_width=pairwise_head_width,
+            pairwise_num_heads=pairwise_num_heads,
+        )
 
         self.outer_product_mean = OuterProductMean(
             c_in=msa_s,
@@ -781,39 +752,6 @@ class MSALayer(nn.Module):
         )
 
         return z, m
-
-
-class BFactorModule(nn.Module):
-    """BFactor Module."""
-
-    def __init__(self, token_s: int, num_bins: int) -> None:
-        """Initialize the bfactor module.
-
-        Parameters
-        ----------
-        token_s : int
-            The token embedding size.
-
-        """
-        super().__init__()
-        self.bfactor = nn.Linear(token_s, num_bins)
-        self.num_bins = num_bins
-
-    def forward(self, s: Tensor) -> Tensor:
-        """Perform the forward pass.
-
-        Parameters
-        ----------
-        s : Tensor
-            The sequence embeddings
-
-        Returns
-        -------
-        Tensor
-            The predicted bfactor histogram.
-
-        """
-        return self.bfactor(s)
 
 
 class DistogramModule(nn.Module):
